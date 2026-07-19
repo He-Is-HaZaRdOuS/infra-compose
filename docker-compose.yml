@@ -1,0 +1,135 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg18
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    networks:
+      - infra
+    restart: unless-stopped
+
+  pgadmin:
+    image: dpage/pgadmin4:9.16
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: password
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - infra
+    ports:
+      - "8081:80"
+    restart: unless-stopped
+
+  mongodb:
+    image: mongo:8.0.4
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mongo
+      MONGO_INITDB_ROOT_PASSWORD: password
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - infra
+    restart: unless-stopped
+
+  mongo-compass:
+    image: haohanyang/compass-web:0.5.0
+    ports:
+      - "27018:8080"
+    environment:
+      - CW_MONGO_URI=mongodb://mongo:password@mongodb:27017/?authSource=admin
+      - CW_ENABLE_SHELL=true
+      - CW_MASTER_PASSWORD=password
+    depends_on:
+      - mongodb
+    networks:
+      - infra
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.0
+    command: start-dev
+    environment:
+      KEYCLOAK_ADMIN: keycloak
+      KEYCLOAK_ADMIN_PASSWORD: password
+      KC_PROXY_HEADERS: xforwarded
+      KC_PROXY: edge
+      KC_HOSTNAME_STRICT: false
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+    networks:
+      - infra
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  typesense:
+    image: typesense/typesense:30.0
+    environment:
+      TYPESENSE_API_KEY: password
+      TYPESENSE_DATA_DIR: /data
+      TYPESENSE_ENABLE_CORS: "true"
+      TYPESENSE_CORS_ORIGINS: "*"
+    volumes:
+      - typesense_data:/data
+    networks:
+      - infra
+    ports:
+      - "8108:8108"
+    restart: unless-stopped
+
+  typesense-dashboard:
+    image: ghcr.io/bfritscher/typesense-dashboard:2.4.8
+    depends_on:
+      - typesense
+    networks:
+      - infra
+    ports:
+      - "80:80"
+    restart: unless-stopped
+
+  redis:
+    image: redis:8.8.0
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - infra
+    restart: unless-stopped
+
+  redis-insight:
+    image: redis/redisinsight:3.6
+    depends_on:
+      - redis
+    ports:
+      - "5540:5540"
+    volumes:
+      - redis_insight_data:/data
+    networks:
+      - infra
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  pgadmin_data:
+  mongodb_data:
+  typesense_data:
+  keycloak_data:
+  redis_data:
+  redis_insight_data:
+
+networks:
+  infra:
+    external: true
